@@ -122,6 +122,15 @@ FindCipherSuite:
 	}
 
 	certMsg := new(certificateMsg)
+	if config.SNICallback != nil && len(clientHello.serverName) > 0 {
+		nextConfig := config.SNICallback(clientHello.serverName)
+
+		if nextConfig != nil {
+			c.config = nextConfig
+			config = nextConfig
+		}
+	}
+
 	if len(clientHello.serverName) > 0 {
 		c.serverName = clientHello.serverName
 		certMsg.certificates = config.getCertificateForName(clientHello.serverName).Certificate

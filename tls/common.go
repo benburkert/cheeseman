@@ -140,6 +140,9 @@ type Config struct {
 	// Server configurations must include at least one certificate.
 	Certificates []Certificate
 
+	// SNICallback can change the Config used in the TLS connection.
+	SNICallback func(servername string) *Config
+
 	// NameToCertificate maps from a certificate name to an element of
 	// Certificates. Note that a certificate name can be of the form
 	// '*.example.com' and so doesn't have to be a domain name as such.
