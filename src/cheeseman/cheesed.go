@@ -1,8 +1,8 @@
 package main
 
 import (
-	"flag"
 	"cheeseman/server"
+	"flag"
 )
 
 var (
@@ -14,7 +14,7 @@ func main() {
 		panic("Missing config file (-c) argument.")
 	}
 
-	config := server.LoadConfig(*configFile)
+	config, err := server.LoadConfig(*configFile)
 
 	server := server.NewServer(config)
 

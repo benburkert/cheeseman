@@ -1,8 +1,8 @@
 package server
 
 import (
-	"net"
 	"github.com/benburkert/goini"
+	"net"
 )
 
 type Error struct {
@@ -10,21 +10,23 @@ type Error struct {
 }
 
 type Config struct {
-	Addr string
-	Type string
+	Address string
+	Type    string
 }
 
-func NewConfig() (*Config) {
+func NewConfig() *Config {
 	return &Config{
-		Addr: "0.0.0.0:443",
-		Type: "tcp4",
+		Address: "0.0.0.0:443",
+		Type:    "tcp4",
 	}
 }
 
-func LoadConfig(filePath string) (config *Config) {
+func LoadConfig(filePath string) (config *Config, err error) {
 	config = NewConfig()
 
 	config.Load(filePath)
+
+	err = config.Verify()
 
 	return
 }
@@ -36,9 +38,9 @@ func (config *Config) Load(filePath string) (err error) {
 		return
 	}
 
-	s, found := dict.GetString("cheesed", "addr")
+	s, found := dict.GetString("cheesed", "address")
 	if found {
-		config.Addr = s
+		config.Address = s
 	}
 
 	s, found = dict.GetString("cheesed", "type")
@@ -50,8 +52,8 @@ func (config *Config) Load(filePath string) (err error) {
 }
 
 func (config *Config) Verify() (err error) {
-	if config.Addr == "" {
-		return _error("Addr cannot be empty")
+	if config.Address == "" {
+		return _error("Address cannot be empty")
 	}
 
 	if config.Type == "" {
@@ -60,7 +62,9 @@ func (config *Config) Verify() (err error) {
 
 	switch config.Type {
 	case "tcp", "tcp4", "tcp6":
-		_, err = net.ResolveTCPAddr(config.Type, config.Addr)
+		_, err = net.ResolveTCPAddr(config.Type, config.Address)
+	case "unix", "unixpacket", "unixgram":
+		_, err = net.ResolveUnixAddr(config.Type, config.Address)
 	}
 
 	return
