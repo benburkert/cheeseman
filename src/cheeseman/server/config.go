@@ -1,8 +1,13 @@
 package server
 
 import (
+	"net"
 	"github.com/benburkert/goini"
 )
+
+type Error struct {
+	message string
+}
 
 type Config struct {
 	Addr string
@@ -45,5 +50,26 @@ func (config *Config) Load(filePath string) (err error) {
 }
 
 func (config *Config) Verify() (err error) {
-	return nil
+	if config.Addr == "" {
+		return _error("Addr cannot be empty")
+	}
+
+	if config.Type == "" {
+		return _error("Type cannot be empty")
+	}
+
+	switch config.Type {
+	case "tcp", "tcp4", "tcp6":
+		_, err = net.ResolveTCPAddr(config.Type, config.Addr)
+	}
+
+	return
+}
+
+func _error(message string) (err error) {
+	return Error{message: message}
+}
+
+func (err Error) Error() string {
+	return err.message
 }
