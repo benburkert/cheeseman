@@ -10,14 +10,18 @@ type Error struct {
 }
 
 type Config struct {
-	Address string
-	Type    string
+	Address     string
+	Type        string
+	Certificate string
+	Key         string
+	Log         string
 }
 
 func NewConfig() *Config {
 	return &Config{
 		Address: "0.0.0.0:443",
 		Type:    "tcp4",
+		Log:     "stdout",
 	}
 }
 

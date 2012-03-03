@@ -14,7 +14,7 @@ func main() {
 		panic("Missing config file (-c) argument.")
 	}
 
-	config, err := server.LoadConfig(*configFile)
+	config, _ := server.LoadConfig(*configFile)
 
 	server := server.NewServer(config)
 
