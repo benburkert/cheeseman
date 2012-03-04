@@ -1,7 +1,11 @@
 package server
 
 import (
+	"crypto/tls"
+	"crypto/x509"
+	"encoding/pem"
 	"io/ioutil"
+	"net"
 	"os"
 	"path/filepath"
 	"testing"
@@ -23,6 +27,19 @@ func TestNewServer(t *testing.T) {
 	if (fi.Mode() & os.ModeSocket) == 0 {
 		t.Fatalf("Server is not listening on socket: %s\n", config.Address)
 	}
+}
+
+func TestDefaultConnection(t *testing.T) {
+	config := testConfig(t)
+
+	srv := NewServer(config)
+	defer srv.Stop()
+	srv.Start()
+
+	cli := socketClient(config.Address, t)
+	defer cli.Close()
+
+	cli.Handshake()
 }
 
 func testConfig(t *testing.T) (cfg *Config) {
@@ -58,6 +75,34 @@ func loadTempFile(name, data string, t *testing.T) string {
 	return file.Name()
 }
 
+func socketClient(socketPath string, t *testing.T) (conn *tls.Conn) {
+	sConn, err := net.Dial("unix", socketPath)
+
+	if err != nil {
+		t.Fatalf("Error establishing client connection: %s", err.Error())
+	}
+
+	conn = tls.Client(sConn, clientConfig(t))
+
+	return
+}
+
+func clientConfig(t *testing.T) (cfg *tls.Config) {
+	cblock, _ := pem.Decode([]byte(certExampleOrg))
+
+	rootCert, err := x509.ParseCertificate(cblock.Bytes)
+
+	if err != nil {
+		t.Fatalf("Error parsing cert: %s", err.Error())
+	}
+
+	cfg = new(tls.Config)
+	cfg.RootCAs = x509.NewCertPool()
+	cfg.RootCAs.AddCert(rootCert)
+
+	return
+}
+
 var (
 	certExampleOrg = `
 -----BEGIN CERTIFICATE-----
@@ -73,7 +118,7 @@ d2p1SIE1PxpB2ZiOUyVNOaONtSeIacUSafCDd/fGjpYsUmuDMGWXrLiPqhS0DmT6
 ZQ3YeYIUTVuwZrJsIf4SY8MkNOK4oZGcadjN
 -----END CERTIFICATE-----
 `
-	keyExampleOrg  = `
+	keyExampleOrg = `
 -----BEGIN RSA PRIVATE KEY-----
 MIICXAIBAAKBgQC7bbeY2N0uA6Au6YGbtt18PRfy10TMQtSWbbV+tdAyh7JeiIMJ
 I/4isDpr8PbBrdC9P/YrMgyiF99sByaw60Q1O10/bAR6Xqt1L34XH4NNSv7/ZiWJ

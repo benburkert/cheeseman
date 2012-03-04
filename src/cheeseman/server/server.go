@@ -13,6 +13,7 @@ type Server struct {
 	log         *log.Logger
 	listener    net.Listener
 	certificate tls.Certificate
+	tlsConfig   *tls.Config
 }
 
 func NewServer(config *Config) (srv *Server) {
@@ -21,38 +22,69 @@ func NewServer(config *Config) (srv *Server) {
 	return srv
 }
 
+func (srv *Server) Start() {
+	go srv.Run()
+}
+
 func (srv *Server) Run() {
+	defer srv.listener.Close()
+
+	for {
+		conn, err := srv.listener.Accept()
+		if err != nil {
+			srv._error(err.Error())
+			return
+		}
+
+		srv.handle(conn)
+	}
+}
+
+func (srv *Server) Stop() {
+}
+
+func (srv *Server) handle(inner net.Conn) {
+	conn := tls.Server(inner, srv.tlsConfig)
+	defer conn.Close()
+
+	conn.Handshake()
 }
 
 func (srv *Server) setup(config *Config) {
 	var logWriter io.Writer
+	var err error
 
 	switch strings.ToLower(config.Log) {
 	case "stdout":
 		logWriter = os.Stdout
 	default:
-		var oerr error
-		logWriter, oerr = os.OpenFile(config.Log, os.O_APPEND, 0666)
+		logWriter, err = os.OpenFile(config.Log, os.O_APPEND, 0666)
 
-		if oerr != nil {
-			panic(oerr.Error())
+		if err != nil {
+			panic(err.Error())
 		}
 	}
 
 	srv.log = log.New(logWriter, "cheesed", os.O_APPEND)
 
-	listener, lerr := net.Listen(config.Type, config.Address)
-	if lerr != nil {
-		srv._fatal(lerr.Error())
+	srv.listener, err = net.Listen(config.Type, config.Address)
+	if err != nil {
+		srv._fatal(err.Error())
 	}
 
-	certificate, cerr := tls.LoadX509KeyPair(config.Certificate, config.Key)
-	if cerr != nil {
-		srv._fatal(cerr.Error())
+	srv.certificate, err = tls.LoadX509KeyPair(config.Certificate, config.Key)
+	if err != nil {
+		srv._fatal(err.Error())
 	}
 
-	srv.listener = listener
-	srv.certificate = certificate
+	srv.tlsConfig = &tls.Config{
+		Certificates: []tls.Certificate{srv.certificate},
+	}
+
+}
+
+func (srv *Server) _error(message string) {
+	srv.log.Print(message)
 }
 
 func (srv *Server) _fatal(message string) {

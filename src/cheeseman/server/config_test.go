@@ -95,7 +95,7 @@ var (
 Address = 0.0.0.0:443;
 Type    = tcp4;
 `
-	socketIni  = `#
+	socketIni = `#
 # unix socket ini file
 #
 

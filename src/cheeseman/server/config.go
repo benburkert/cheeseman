@@ -1,7 +1,7 @@
 package server
 
 import (
-	"github.com/benburkert/goini"
+	"github.com/glacjay/goini"
 	"net"
 )
 
