@@ -42,6 +42,27 @@ func TestDefaultConnection(t *testing.T) {
 	cli.Handshake()
 }
 
+func TestMultipleConnections(t *testing.T) {
+	config := testConfig(t)
+
+	srv := NewServer(config)
+	defer srv.Stop()
+	srv.Start()
+
+	cli1 := socketClient(config.Address, t)
+	defer cli1.Close()
+
+	cli2 := socketClient(config.Address, t)
+	defer cli2.Close()
+
+	cli3 := socketClient(config.Address, t)
+	defer cli3.Close()
+
+	cli2.Handshake()
+	cli3.Handshake()
+	cli1.Handshake()
+}
+
 func testConfig(t *testing.T) (cfg *Config) {
 	cfg = NewConfig()
 

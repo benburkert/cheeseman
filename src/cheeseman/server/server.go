@@ -10,8 +10,9 @@ import (
 )
 
 type Server struct {
+	connections chan net.Conn
 	log         *log.Logger
-	listener    net.Listener
+	listener    *Listener
 	certificate tls.Certificate
 	tlsConfig   *tls.Config
 }
@@ -27,20 +28,22 @@ func (srv *Server) Start() {
 }
 
 func (srv *Server) Run() {
-	defer srv.listener.Close()
-
-	for {
-		conn, err := srv.listener.Accept()
-		if err != nil {
-			srv._error(err.Error())
-			return
+	go func() {
+		for {
+			conn := <-srv.connections
+			go srv.handle(conn)
 		}
+	}()
 
-		srv.handle(conn)
+	err := srv.listener.Run()
+
+	if err != nil {
+		srv._error(err.Error())
 	}
 }
 
 func (srv *Server) Stop() {
+	srv.listener.Stop()
 }
 
 func (srv *Server) handle(inner net.Conn) {
@@ -67,7 +70,9 @@ func (srv *Server) setup(config *Config) {
 
 	srv.log = log.New(logWriter, "cheesed", os.O_APPEND)
 
-	srv.listener, err = net.Listen(config.Type, config.Address)
+	srv.connections = make(chan net.Conn, 1024)
+
+	srv.listener, err = NewListener(config.Type, config.Address, srv.connections)
 	if err != nil {
 		srv._fatal(err.Error())
 	}
