@@ -1,7 +1,7 @@
 package server
 
 import (
-	"crypto/tls"
+	"../tls"
 	"io"
 	"log"
 	"net"

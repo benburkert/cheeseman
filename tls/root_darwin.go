@@ -20,7 +20,7 @@ package tls
 //
 // Note: The CFDataRef returned in pemRoots must be released (using CFRelease) after
 // we've consumed its content.
-int FetchPEMRoots(CFDataRef *pemRoots) {
+int CheesemanFetchPEMRoots(CFDataRef *pemRoots) {
 	if (pemRoots == NULL) {
 		return -1;
 	}
@@ -84,7 +84,7 @@ func initDefaultRoots() {
 	roots := x509.NewCertPool()
 
 	var data C.CFDataRef = nil
-	err := C.FetchPEMRoots(&data)
+	err := C.CheesemanFetchPEMRoots(&data)
 	if err != -1 {
 		defer C.CFRelease(C.CFTypeRef(data))
 		buf := C.GoBytes(unsafe.Pointer(C.CFDataGetBytePtr(data)), C.int(C.CFDataGetLength(data)))
