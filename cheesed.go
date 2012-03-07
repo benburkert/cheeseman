@@ -1,7 +1,7 @@
 package main
 
 import (
-	"cheeseman/server"
+	"./server"
 	"flag"
 )
 
