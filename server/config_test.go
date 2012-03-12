@@ -51,6 +51,19 @@ func TestLoadIni(t *testing.T) {
 	assertEqual(socketConfig.Type, "unix", "Type", t)
 }
 
+func TestSNIAdapterIni(t *testing.T) {
+	mainConfig := loadTempConfig(sniIni, t)
+	assertEqual(mainConfig.SNIAdapterName, "inmemory", "SNIAdapter", t)
+
+	sniConfig := mainConfig.SNIAdapterConfig
+
+	_, ok := sniConfig["foo.example.com"]
+
+	if !ok {
+		t.Fatal("Error parsing SNI Adapter config")
+	}
+}
+
 func assertEqual(actual, expected, description string, t *testing.T) {
 	if actual != expected {
 		t.Fatalf("Ini parse failed on %s: %s != %s", description, actual, expected)
@@ -103,5 +116,15 @@ Type    = tcp4;
 
 address = /path/to/server.sock;
 TYPE    = unix;
+`
+	sniIni = `#
+# SNI adapter ini file
+
+[Cheesed]
+
+SNIAdapter = InMemory
+
+[InMemory]
+foo.example.com = /fake/path/to/*.pem;
 `
 )

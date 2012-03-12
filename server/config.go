@@ -3,6 +3,7 @@ package server
 import (
 	"github.com/glacjay/goini"
 	"net"
+	"strings"
 )
 
 type Error struct {
@@ -10,11 +11,13 @@ type Error struct {
 }
 
 type Config struct {
-	Address     string
-	Type        string
-	Certificate string
-	Key         string
-	Log         string
+	Address          string
+	Type             string
+	Certificate      string
+	Key              string
+	Log              string
+	SNIAdapterName   string
+	SNIAdapterConfig map[string]string
 }
 
 func NewConfig() *Config {
@@ -50,6 +53,17 @@ func (config *Config) Load(filePath string) (err error) {
 	s, found = dict.GetString("cheesed", "type")
 	if found {
 		config.Type = s
+	}
+
+	s, found = dict.GetString("cheesed", "sniadapter")
+	if found {
+		config.SNIAdapterName = strings.ToLower(s)
+
+		sniConfig, found := dict[config.SNIAdapterName]
+
+		if found {
+			config.SNIAdapterConfig = sniConfig
+		}
 	}
 
 	return
