@@ -22,9 +22,10 @@ type Config struct {
 
 func NewConfig() *Config {
 	return &Config{
-		Address: "0.0.0.0:443",
-		Type:    "tcp4",
-		Log:     "stdout",
+		Address:          "0.0.0.0:443",
+		Type:             "tcp4",
+		Log:              "stdout",
+		SNIAdapterConfig: make(map[string]string),
 	}
 }
 

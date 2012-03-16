@@ -1,6 +1,7 @@
 package server
 
 import (
+	"../sni"
 	"../tls"
 	"io"
 	"log"
@@ -15,6 +16,7 @@ type Server struct {
 	listener    *Listener
 	certificate tls.Certificate
 	tlsConfig   *tls.Config
+	sniAdapter  sni.Adapter
 }
 
 func NewServer(config *Config) (srv *Server) {
@@ -82,10 +84,22 @@ func (srv *Server) setup(config *Config) {
 		srv._fatal(err.Error())
 	}
 
-	srv.tlsConfig = &tls.Config{
-		Certificates: []tls.Certificate{srv.certificate},
+	srv.sniAdapter, err = sni.NewAdapter(config.SNIAdapterName, config.SNIAdapterConfig)
+	if err != nil {
+		srv._fatal(err.Error())
 	}
 
+	srv.tlsConfig = &tls.Config{
+		Certificates: []tls.Certificate{srv.certificate},
+		SNICallback:  srv.sniCallback(),
+	}
+
+}
+
+func (srv *Server) sniCallback() func(string) *tls.Config {
+	return func(servername string) *tls.Config {
+		return srv.sniAdapter.Callback(servername)
+	}
 }
 
 func (srv *Server) _error(message string) {

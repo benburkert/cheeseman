@@ -1,7 +1,7 @@
 package server
 
 import (
-	"crypto/tls"
+	"../tls"
 	"crypto/x509"
 	"encoding/pem"
 	"io/ioutil"
@@ -63,6 +63,23 @@ func TestMultipleConnections(t *testing.T) {
 	cli1.Handshake()
 }
 
+func TestSNIConnection(t *testing.T) {
+	config := testSNIConfig(t)
+
+	srv := NewServer(config)
+	defer srv.Stop()
+	srv.Start()
+
+	defaultClient := socketClient(config.Address, t)
+	defer defaultClient.Close()
+
+	fooClient := socketSNIClient(config.Address, "foo.example.org", t)
+	defer fooClient.Close()
+
+	defaultClient.Handshake()
+	fooClient.Handshake()
+}
+
 func testConfig(t *testing.T) (cfg *Config) {
 	cfg = NewConfig()
 
@@ -76,6 +93,17 @@ func testConfig(t *testing.T) (cfg *Config) {
 
 	cfg.Certificate = loadTempFile("cert", certExampleOrg, t)
 	cfg.Key = loadTempFile("key", keyExampleOrg, t)
+
+	cfg.SNIAdapterName = "inmemory"
+
+	return
+}
+
+func testSNIConfig(t *testing.T) (cfg *Config) {
+	cfg = testConfig(t)
+
+	paths := tempFile(certFooExampleOrg, t) + "," + tempFile(keyFooExampleOrg, t)
+	cfg.SNIAdapterConfig["foo.example.org"] = paths
 
 	return
 }
@@ -97,13 +125,28 @@ func loadTempFile(name, data string, t *testing.T) string {
 }
 
 func socketClient(socketPath string, t *testing.T) (conn *tls.Conn) {
-	sConn, err := net.Dial("unix", socketPath)
+	sConn := unixConn(socketPath, t)
+
+	conn = tls.Client(sConn, clientConfig(t))
+
+	return
+}
+
+func socketSNIClient(socketPath, servername string, t *testing.T) (conn *tls.Conn) {
+	sConn := unixConn(socketPath, t)
+	conf := clientSNIConfig(servername, t)
+
+	conn = tls.Client(sConn, conf)
+
+	return
+}
+
+func unixConn(socketPath string, t *testing.T) (conn net.Conn) {
+	conn, err := net.Dial("unix", socketPath)
 
 	if err != nil {
 		t.Fatalf("Error establishing client connection: %s", err.Error())
 	}
-
-	conn = tls.Client(sConn, clientConfig(t))
 
 	return
 }
@@ -122,6 +165,28 @@ func clientConfig(t *testing.T) (cfg *tls.Config) {
 	cfg.RootCAs.AddCert(rootCert)
 
 	return
+}
+
+func clientSNIConfig(servername string, t *testing.T) (cfg *tls.Config) {
+	cfg = clientConfig(t)
+
+	cfg.ServerName = servername
+
+	return
+}
+
+func tempFile(body string, t *testing.T) (path string) {
+	file, err := ioutil.TempFile("", "")
+	if err != nil {
+		t.Fatalf("Error creating temp file: %s", err.Error())
+	}
+
+	_, err = file.WriteString(body)
+	if err != nil {
+		t.Fatalf("Error writing to temp file: %s", err.Error())
+	}
+
+	return file.Name()
 }
 
 var (
@@ -154,6 +219,30 @@ rn6eNLEwtcYKlSCX/oxhfJo4P4NGpCTbwuVGiMDEGRHpZuSsvO9hCq4GowJAaNuZ
 xtKG/TrZ8C/RMsnXByXwcwpyXESLq44QgjYle4lRp5N35f6DlA5fALc1A7weY7b4
 eR+qoOsRhiaYgiuGwQJBAOcf4m1qt6uAwZAV+OFJKTJLi0w+e1iXbiHTHd8JGBYj
 KO7JFQZQqEdJJmWb0kCCibHxsOKbFk5V8hpgVgjcTnU=
+-----END RSA PRIVATE KEY-----
+`
+	certFooExampleOrg = `
+-----BEGIN CERTIFICATE-----
+MIIBhjCB8AIJAK9BK0MsWFFjMA0GCSqGSIb3DQEBBQUAMCgxEDAOBgNVBAoTB0Fj
+bWUgQ28xFDASBgNVBAMTC2V4YW1wbGUub3JnMB4XDTEyMDIxMjAyNTIxNVoXDTM5
+MDYyOTAyNTIxNVowLDEQMA4GA1UEChMHQWNtZSBDbzEYMBYGA1UEAxMPZm9vLmV4
+YW1wbGUub3JnMFwwDQYJKoZIhvcNAQEBBQADSwAwSAJBAMKeXMzz0j/ba3st031C
+xWUmUQNtE7/txtGKzuTYp5vvriVf+NOhEsynWZWlMVMCiNg8YALiH+4gubd/YHeE
+gxECAwEAATANBgkqhkiG9w0BAQUFAAOBgQAsKfG3DLJPcKx4O9u1Bfn9efmSBjYm
+nOGK3+MCrL0ZRMwJrwTTmJcPYNFMxcbnZ3d/e3bePu30inbf7SLWSzU/IV84d1ou
+vMxIk+ic9hafN9yoVo24Wye963YExok2gdbe0yxz5ij/WEB82Hz7hr4QGl+npwUe
+Dpv+sTN+P+FrZQ==
+-----END CERTIFICATE-----
+`
+	keyFooExampleOrg = `
+-----BEGIN RSA PRIVATE KEY-----
+MIIBOgIBAAJBAMKeXMzz0j/ba3st031CxWUmUQNtE7/txtGKzuTYp5vvriVf+NOh
+EsynWZWlMVMCiNg8YALiH+4gubd/YHeEgxECAwEAAQJBAJEjnxut/i9nSMnNTDrP
+T/z2TVabwy3QewSMW21pcd4k3AETYYE+ZMOp/3cxkMLj/ph05uWy22BXIl+xeJHi
+pU0CIQDy66CQ5uzlczhXwUZRBJXZ/2TQhZCzs8rKQlKWgO0gJwIhAM0Y85PAbxxc
+2ZYWAYcGV66RK37HEtMmj2QQTMvKFY4HAiAFRGCl46vtSbNGC9XHee753BTGhK7f
+hp12BzwdMUxy7wIgDsI45Oz4EeZskexLd9fw/1La+miA5kjkEKNLo26LVokCIDGP
+WhXudo1UBysfBu4EWopmQDgEdKFVs4eh2b1xqw4f
 -----END RSA PRIVATE KEY-----
 `
 )
