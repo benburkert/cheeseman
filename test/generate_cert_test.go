@@ -22,6 +22,12 @@ func TestGenerateCA(t *testing.T) {
 
 	assert(bytes.Compare(cert.SubjectKeyId, cert.AuthorityKeyId) == 0, "Cert is not self signed", t)
 	assert(cert.IsCA, "Cert lacks X509v3 Basic Constraints CA:TRUE", t)
+
+	err = cert.VerifyHostname("example.com")
+
+	if err != nil {
+		t.Fatalf("Error verifying CA certificate hostname: %s", err.Error())
+	}
 }
 
 func assertEqual(actual, expected interface{}, description string, t *testing.T) {
