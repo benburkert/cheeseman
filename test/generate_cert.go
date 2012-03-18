@@ -19,6 +19,29 @@ type Error struct {
 }
 
 func GenerateCA(hostname string) (*x509.Certificate, error) {
+	return buildCert(func(template *x509.Certificate, key *rsa.PrivateKey) ([]byte, error) {
+		template.Subject.CommonName = hostname
+		template.AuthorityKeyId = template.SubjectKeyId
+		template.KeyUsage = x509.KeyUsageCertSign
+		template.BasicConstraintsValid = true
+		template.IsCA = true
+
+		return x509.CreateCertificate(rand.Reader, template, template, &key.PublicKey, key)
+	})
+}
+
+func GenerateIntermediate(hostname string, caCert *x509.Certificate) (*x509.Certificate, error) {
+	return buildCert(func(template *x509.Certificate, key *rsa.PrivateKey) ([]byte, error) {
+		template.Subject.CommonName = hostname
+		template.AuthorityKeyId = caCert.SubjectKeyId
+		template.KeyUsage = x509.KeyUsageCertSign
+		template.IsCA = false
+
+		return x509.CreateCertificate(rand.Reader, template, caCert, &key.PublicKey, key)
+	})
+}
+
+func buildCert(finisher func(*x509.Certificate, *rsa.PrivateKey) ([]byte, error)) (*x509.Certificate, error) {
 	priv, err := rsa.GenerateKey(rand.Reader, 1024)
 	if err != nil {
 		return nil, err
@@ -31,25 +54,23 @@ func GenerateCA(hostname string) (*x509.Certificate, error) {
 		Version: 3,
 
 		Subject: pkix.Name{
-			CommonName:   hostname,
 			Country:      []string{"US"},
 			Province:     []string{"CA"},
 			Locality:     []string{"SF"},
 			Organization: []string{"Cheeseman"},
 		},
 
-		SerialNumber:   serial,
-		NotBefore:      time.Now(),
-		NotAfter:       time.Now(),
-		SubjectKeyId:   keyId,
-		AuthorityKeyId: keyId,
-
-		KeyUsage:              x509.KeyUsageCertSign,
-		BasicConstraintsValid: true,
-		IsCA:                  true,
+		SerialNumber: serial,
+		NotBefore:    time.Now(),
+		NotAfter:     time.Now(),
+		SubjectKeyId: keyId,
 	}
 
-	derBytes, err := x509.CreateCertificate(rand.Reader, &template, &template, &priv.PublicKey, priv)
+	derBytes, err := finisher(&template, priv)
+
+	if err != nil {
+		return nil, err
+	}
 
 	certs, err := x509.ParseCertificates(derBytes)
 

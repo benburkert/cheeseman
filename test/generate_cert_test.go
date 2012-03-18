@@ -2,8 +2,22 @@ package test
 
 import (
 	"bytes"
+	"crypto/x509"
 	"testing"
 )
+
+var (
+	ca0Cert *x509.Certificate
+)
+
+func init() {
+	var err error
+	ca0Cert, err = GenerateCA("ca0")
+
+	if err != nil {
+		panic("Error generating CA certificate: " + err.Error())
+	}
+}
 
 func TestGenerateCA(t *testing.T) {
 	cert, err := GenerateCA("example.com")
@@ -28,6 +42,18 @@ func TestGenerateCA(t *testing.T) {
 	if err != nil {
 		t.Fatalf("Error verifying CA certificate hostname: %s", err.Error())
 	}
+}
+
+func TestGenerateIntermediate(t *testing.T) {
+	cert, err := GenerateIntermediate("example.com", ca0Cert)
+
+	if err != nil {
+		t.Fatalf("Error generating intermediate certificate: %s", err.Error())
+	}
+
+	assert(bytes.Compare(cert.AuthorityKeyId, ca0Cert.SubjectKeyId) == 0, "Cert is not signed by the CA", t)
+	assert(!cert.IsCA, "Cert has X509v3 Basic Constraints CA:TRUE", t)
+
 }
 
 func assertEqual(actual, expected interface{}, description string, t *testing.T) {
