@@ -35,9 +35,17 @@ func GenerateIntermediate(hostname string, caCert *x509.Certificate) (*x509.Cert
 		template.Subject.CommonName = hostname
 		template.AuthorityKeyId = caCert.SubjectKeyId
 		template.KeyUsage = x509.KeyUsageCertSign
-		template.IsCA = false
 
 		return x509.CreateCertificate(rand.Reader, template, caCert, &key.PublicKey, key)
+	})
+}
+
+func GenerateCert(hostname string, parent *x509.Certificate) (*x509.Certificate, error) {
+	return buildCert(func(template *x509.Certificate, key *rsa.PrivateKey) ([]byte, error) {
+		template.Subject.CommonName = hostname
+		template.AuthorityKeyId = parent.SubjectKeyId
+
+		return x509.CreateCertificate(rand.Reader, template, parent, &key.PublicKey, key)
 	})
 }
 

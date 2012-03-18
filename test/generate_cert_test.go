@@ -53,7 +53,18 @@ func TestGenerateIntermediate(t *testing.T) {
 
 	assert(bytes.Compare(cert.AuthorityKeyId, ca0Cert.SubjectKeyId) == 0, "Cert is not signed by the CA", t)
 	assert(!cert.IsCA, "Cert has X509v3 Basic Constraints CA:TRUE", t)
+	assert(cert.KeyUsage & x509.KeyUsageCertSign == x509.KeyUsageCertSign, "Cert cannot sign other certs.", t)
+}
 
+func TestGenerateCert(t *testing.T) {
+	cert, err := GenerateCert("example.com", ca0Cert)
+	if err != nil {
+		t.Fatalf("Error generating intermediate certificate: %s", err.Error())
+	}
+
+	assert(bytes.Compare(cert.AuthorityKeyId, ca0Cert.SubjectKeyId) == 0, "Cert is not signed by the CA", t)
+	assert(!cert.IsCA, "Cert has X509v3 Basic Constraints CA:TRUE", t)
+	assert(cert.KeyUsage ^ x509.KeyUsageCertSign == x509.KeyUsageCertSign, "Cert can sign other certs.", t)
 }
 
 func assertEqual(actual, expected interface{}, description string, t *testing.T) {
