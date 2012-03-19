@@ -6,21 +6,8 @@ import (
 	"testing"
 )
 
-var (
-	ca0Cert *x509.Certificate
-)
-
-func init() {
-	var err error
-	ca0Cert, err = GenerateCA("ca0")
-
-	if err != nil {
-		panic("Error generating CA certificate: " + err.Error())
-	}
-}
-
 func TestGenerateCA(t *testing.T) {
-	cert, err := GenerateCA("example.com")
+	cert, _, err := GenerateCAPair("example.com")
 
 	if err != nil {
 		t.Fatalf("Error generating CA certificate: %s", err.Error())
@@ -42,29 +29,53 @@ func TestGenerateCA(t *testing.T) {
 	if err != nil {
 		t.Fatalf("Error verifying CA certificate hostname: %s", err.Error())
 	}
-}
 
-func TestGenerateIntermediate(t *testing.T) {
-	cert, err := GenerateIntermediate("example.com", ca0Cert)
+	pool := x509.NewCertPool()
+	pool.AddCert(cert)
+
+	chain, err := cert.Verify(x509.VerifyOptions{
+		DNSName: "example.com",
+		Roots:   pool,
+	})
 
 	if err != nil {
-		t.Fatalf("Error generating intermediate certificate: %s", err.Error())
+		t.Fatalf("Error verifying a single cert: %s", err.Error())
 	}
 
-	assert(bytes.Compare(cert.AuthorityKeyId, ca0Cert.SubjectKeyId) == 0, "Cert is not signed by the CA", t)
-	assert(!cert.IsCA, "Cert has X509v3 Basic Constraints CA:TRUE", t)
-	assert(cert.KeyUsage & x509.KeyUsageCertSign == x509.KeyUsageCertSign, "Cert cannot sign other certs.", t)
+	assertEqual(len(chain), 1, "Verified Cert Chain", t)
 }
 
 func TestGenerateCert(t *testing.T) {
-	cert, err := GenerateCert("example.com", ca0Cert)
+	caCert, caKey, _ := GenerateCAPair("alpha")
+
+	cert, _, err := GenerateCertPair("beta", caCert, caKey)
 	if err != nil {
 		t.Fatalf("Error generating intermediate certificate: %s", err.Error())
 	}
 
-	assert(bytes.Compare(cert.AuthorityKeyId, ca0Cert.SubjectKeyId) == 0, "Cert is not signed by the CA", t)
+	assert(bytes.Compare(cert.AuthorityKeyId, caCert.SubjectKeyId) == 0, "Cert is not signed by the CA", t)
 	assert(!cert.IsCA, "Cert has X509v3 Basic Constraints CA:TRUE", t)
-	assert(cert.KeyUsage ^ x509.KeyUsageCertSign == x509.KeyUsageCertSign, "Cert can sign other certs.", t)
+	assert(cert.KeyUsage^x509.KeyUsageCertSign == x509.KeyUsageCertSign, "Cert can sign other certs.", t)
+
+	err = cert.VerifyHostname("beta")
+
+	if err != nil {
+		t.Fatalf("Error verifying certificate hostname: %s", err.Error())
+	}
+
+	pool := x509.NewCertPool()
+	pool.AddCert(caCert)
+
+	chain, err := cert.Verify(x509.VerifyOptions{
+		DNSName: "beta",
+		Roots:   pool,
+	})
+
+	if err != nil {
+		t.Fatalf("Error verifying a single cert: %s", err.Error())
+	}
+
+	assertEqual(len(chain), 1, "Verified Cert Chain", t)
 }
 
 func assertEqual(actual, expected interface{}, description string, t *testing.T) {

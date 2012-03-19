@@ -18,43 +18,33 @@ type Error struct {
 	message string
 }
 
-type templateDecorator func(*x509.Certificate) (*x509.Certificate, *x509.Certificate, error)
+type templateDecorator func(*x509.Certificate) (*x509.Certificate, *x509.Certificate, *rsa.PrivateKey, error)
 
-func GenerateCA(hostname string) (*x509.Certificate, error) {
-	return buildCert(func(template *x509.Certificate) (*x509.Certificate, *x509.Certificate, error) {
+func GenerateCAPair(hostname string) (*x509.Certificate, *rsa.PrivateKey, error) {
+	return buildCert(func(template *x509.Certificate) (*x509.Certificate, *x509.Certificate, *rsa.PrivateKey, error) {
 		template.Subject.CommonName = hostname
 		template.AuthorityKeyId = template.SubjectKeyId
 		template.KeyUsage = x509.KeyUsageCertSign
 		template.BasicConstraintsValid = true
 		template.IsCA = true
 
-		return template, template, nil
+		return template, template, nil, nil
 	})
 }
 
-func GenerateIntermediate(hostname string, caCert *x509.Certificate) (*x509.Certificate, error) {
-	return buildCert(func(template *x509.Certificate) (*x509.Certificate, *x509.Certificate, error) {
+func GenerateCertPair(hostname string, parentCert *x509.Certificate, parentKey *rsa.PrivateKey) (*x509.Certificate, *rsa.PrivateKey, error) {
+	return buildCert(func(template *x509.Certificate) (*x509.Certificate, *x509.Certificate, *rsa.PrivateKey, error) {
 		template.Subject.CommonName = hostname
-		template.AuthorityKeyId = caCert.SubjectKeyId
-		template.KeyUsage = x509.KeyUsageCertSign
+		template.AuthorityKeyId = parentCert.SubjectKeyId
 
-		return template, caCert, nil
+		return template, parentCert, parentKey, nil
 	})
 }
 
-func GenerateCert(hostname string, parent *x509.Certificate) (*x509.Certificate, error) {
-	return buildCert(func(template *x509.Certificate) (*x509.Certificate, *x509.Certificate, error) {
-		template.Subject.CommonName = hostname
-		template.AuthorityKeyId = parent.SubjectKeyId
-
-		return template, parent, nil
-	})
-}
-
-func buildCert(decorator templateDecorator) (*x509.Certificate, error) {
+func buildCert(decorator templateDecorator) (*x509.Certificate, *rsa.PrivateKey, error) {
 	priv, err := rsa.GenerateKey(rand.Reader, 1024)
 	if err != nil {
-		return nil, err
+		return nil, nil, err
 	}
 
 	serial := randBigInt()
@@ -71,32 +61,35 @@ func buildCert(decorator templateDecorator) (*x509.Certificate, error) {
 		},
 
 		SerialNumber: serial,
-		NotBefore:    time.Now(),
-		NotAfter:     time.Now(),
+		NotBefore:    time.Now().Add(-5 * time.Minute).UTC(),
+		NotAfter:     time.Now().Add(5 * time.Minute).UTC(),
 		SubjectKeyId: keyId,
 	}
 
-	cert, parent, err := decorator(&template)
+	cert, parentCert, parentKey, err := decorator(&template)
 	if err != nil {
-		return nil, err
+		return nil, nil, err
 	}
 
-	derBytes, err := x509.CreateCertificate(rand.Reader, cert, parent, &priv.PublicKey, priv)
+	if parentKey == nil {
+		parentKey = priv
+	}
+
+	derBytes, err := x509.CreateCertificate(rand.Reader, cert, parentCert, &priv.PublicKey, parentKey)
 	if err != nil {
-		return nil, err
+		return nil, nil, err
 	}
 
 	certs, err := x509.ParseCertificates(derBytes)
-
 	if err != nil {
-		return nil, err
+		return nil, nil, err
 	}
 
 	if len(certs) != 1 {
-		return nil, newError("Failed to generate a parsable certificate")
+		return nil, nil, newError("Failed to generate a parsable certificate")
 	}
 
-	return certs[0], nil
+	return certs[0], priv, nil
 }
 
 func randBigInt() (value *big.Int) {
