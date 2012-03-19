@@ -3,6 +3,7 @@ package test
 import (
 	"bytes"
 	"crypto/x509"
+	"io/ioutil"
 	"testing"
 )
 
@@ -76,6 +77,28 @@ func TestGenerateCert(t *testing.T) {
 	}
 
 	assertEqual(len(chain), 1, "Verified Cert Chain", t)
+}
+
+func TestTempFilePair(t *testing.T) {
+	cert, key, _ := GenerateCAPair("ca")
+
+	certPath, keyPath, err := TempFilePair(cert, key)
+
+	if err != nil {
+		t.Fatalf("Error creating temp cert & key files: %s", err.Error())
+	}
+
+	_, err = ioutil.ReadFile(certPath)
+
+	if err != nil {
+		t.Fatalf("Error reading temp cert file: %s", err.Error())
+	}
+
+	_, err = ioutil.ReadFile(keyPath)
+
+	if err != nil {
+		t.Fatalf("Error reading temp cert file: %s", err.Error())
+	}
 }
 
 func assertEqual(actual, expected interface{}, description string, t *testing.T) {

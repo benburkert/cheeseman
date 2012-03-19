@@ -5,6 +5,8 @@ import (
 	"crypto/rsa"
 	"crypto/x509"
 	"crypto/x509/pkix"
+	"encoding/pem"
+	"io/ioutil"
 	"math/big"
 	"time"
 )
@@ -39,6 +41,25 @@ func GenerateCertPair(hostname string, parentCert *x509.Certificate, parentKey *
 
 		return template, parentCert, parentKey, nil
 	})
+}
+
+func TempFilePair(cert *x509.Certificate, key *rsa.PrivateKey) (string, string, error) {
+	certFile, err := ioutil.TempFile("", "cert.pem")
+	if err != nil {
+		return "", "", err
+	}
+	defer certFile.Close()
+
+	keyFile, err := ioutil.TempFile("", "key.pem")
+	if err != nil {
+		return "", "", err
+	}
+	defer keyFile.Close()
+
+	pem.Encode(certFile, &pem.Block{Type: "CERTIFICATE", Bytes: cert.Raw})
+	pem.Encode(keyFile, &pem.Block{Type: "RSA PRIVATE KEY", Bytes: x509.MarshalPKCS1PrivateKey(key)})
+
+	return certFile.Name(), keyFile.Name(), nil
 }
 
 func buildCert(decorator templateDecorator) (*x509.Certificate, *rsa.PrivateKey, error) {
