@@ -91,16 +91,14 @@ func (srv *Server) setup(config *Config) {
 	}
 
 	srv.tlsConfig = &tls.Config{
-		Certificates: []tls.Certificate{srv.certificate},
-		SNICallback:  srv.sniCallback(),
+		Certificates:   []tls.Certificate{srv.certificate},
+		GetCertificate: srv.sniCallback,
 	}
 
 }
 
-func (srv *Server) sniCallback() func(string) *tls.Config {
-	return func(servername string) *tls.Config {
-		return srv.sniAdapter.Callback(servername)
-	}
+func (srv *Server) sniCallback(hello *tls.ClientHelloInfo) (*tls.Certificate, error) {
+	return srv.sniAdapter.Callback(hello)
 }
 
 func (srv *Server) _error(message string) {

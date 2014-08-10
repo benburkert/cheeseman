@@ -1,23 +1,24 @@
 package sni
 
 import (
-	"../tls"
+	"crypto/tls"
 	"encoding/pem"
+	"errors"
 	"os"
 	"path/filepath"
 	"strings"
 )
 
 type InMemoryAdapter struct {
-	table map[string]*tls.Config
+	table map[string]*tls.Certificate
 }
 
 func NewInMemoryAdapter(config map[string]string) (Adapter, error) {
 	adapter := new(InMemoryAdapter)
-	adapter.table = make(map[string]*tls.Config)
+	adapter.table = make(map[string]*tls.Certificate)
 
 	for servername, glob := range config {
-		config, err := loadConfig(glob)
+		config, err := loadCertificate(glob)
 
 		if err != nil {
 			return nil, err
@@ -29,35 +30,20 @@ func NewInMemoryAdapter(config map[string]string) (Adapter, error) {
 	return adapter, nil
 }
 
-func (adp *InMemoryAdapter) Callback(servername string) (config *tls.Config) {
-	config, ok := adp.table[strings.ToLower(servername)]
-
+func (adp *InMemoryAdapter) Callback(hello *tls.ClientHelloInfo) (*tls.Certificate, error) {
+	cert, ok := adp.table[strings.ToLower(hello.ServerName)]
 	if !ok {
-		return nil
+		return nil, nil
 	}
 
-	return
+	return cert, nil
 }
 
 var _ = Register("inmemory", func(config map[string]string) (Adapter, error) {
 	return NewInMemoryAdapter(config)
 })
 
-func loadConfig(globs string) (config *tls.Config, err error) {
-	cert, err := loadCert(globs)
-
-	if err != nil {
-		return
-	}
-
-	config = new(tls.Config)
-
-	config.Certificates = []tls.Certificate{cert}
-
-	return
-}
-
-func loadCert(globs string) (tls.Certificate, error) {
+func loadCertificate(globs string) (*tls.Certificate, error) {
 	var cbytes, kbytes *[]byte
 
 	parts := strings.Split(globs, ",")
@@ -66,14 +52,14 @@ func loadCert(globs string) (tls.Certificate, error) {
 		paths, err := filepath.Glob(glob)
 
 		if err != nil {
-			return tls.Certificate{}, err
+			return nil, err
 		}
 
 		for _, path := range paths {
 			block, bytes, err := decode(path)
 
 			if err != nil {
-				return tls.Certificate{}, err
+				return nil, err
 			}
 
 			switch block.Type {
@@ -82,19 +68,20 @@ func loadCert(globs string) (tls.Certificate, error) {
 			case "RSA PRIVATE KEY":
 				kbytes = bytes
 			default:
-				return tls.Certificate{}, _error("Unknown file type " + block.Type + ": " + path)
+				return nil, errors.New("Unknown file type " + block.Type + ": " + path)
 			}
 		}
 	}
 
 	if cbytes == nil {
-		return tls.Certificate{}, _error("Certificate file not found.")
+		return nil, errors.New("Certificate file not found.")
 	}
 	if kbytes == nil {
-		return tls.Certificate{}, _error("RSA Key file not found.")
+		return nil, errors.New("RSA Key file not found.")
 	}
 
-	return tls.X509KeyPair(*cbytes, *kbytes)
+	cert, err := tls.X509KeyPair(*cbytes, *kbytes)
+	return &cert, err
 }
 
 func decode(filepath string) (*pem.Block, *[]byte, error) {
@@ -121,8 +108,4 @@ func decode(filepath string) (*pem.Block, *[]byte, error) {
 	block, _ := pem.Decode(buf)
 
 	return block, &buf, nil
-}
-
-func _error(message string) error {
-	return Error{message: message}
 }

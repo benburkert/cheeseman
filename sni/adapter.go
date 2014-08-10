@@ -3,7 +3,7 @@ package sni
 import "crypto/tls"
 
 type Adapter interface {
-	Callback(servername string) *tls.Config
+	Callback(*tls.ClientHelloInfo) (*tls.Certificate, error)
 }
 
 type Error struct {
