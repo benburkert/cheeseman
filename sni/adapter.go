@@ -1,8 +1,6 @@
 package sni
 
-import (
-	"../tls"
-)
+import "crypto/tls"
 
 type Adapter interface {
 	Callback(servername string) *tls.Config

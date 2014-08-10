@@ -1,7 +1,7 @@
 package server
 
 import (
-	"../tls"
+	"crypto/tls"
 	"crypto/x509"
 	"encoding/pem"
 	"io/ioutil"

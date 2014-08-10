@@ -1,9 +1,10 @@
 package server
 
 import (
-	"github.com/glacjay/goini"
 	"net"
 	"strings"
+
+	"github.com/glacjay/goini"
 )
 
 type Error struct {

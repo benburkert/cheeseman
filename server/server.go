@@ -1,13 +1,14 @@
 package server
 
 import (
-	"../sni"
-	"../tls"
+	"crypto/tls"
 	"io"
 	"log"
 	"net"
 	"os"
 	"strings"
+
+	"github.com/benburkert/cheeseman/sni"
 )
 
 type Server struct {

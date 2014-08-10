@@ -1,8 +1,9 @@
 package main
 
 import (
-	"./server"
 	"flag"
+
+	"github.com/benburkert/cheeseman/server"
 )
 
 var (
